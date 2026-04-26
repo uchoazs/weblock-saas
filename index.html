@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebLook SaaS</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: #0a0a0a;
+    color: white;
+}
+
+header {
+    background: linear-gradient(90deg,#6a00ff,#9d00ff);
+    padding: 18px;
+    text-align: center;
+}
+
+.container { padding: 15px; }
+
+.card {
+    background: #1a1a1a;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 10px;
+}
+
+button {
+    background: #6a00ff;
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 100%;
+    border-radius: 8px;
+    margin-top: 6px;
+}
+
+input, textarea, select {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 8px;
+    border: none;
+}
+
+.hidden { display: none; }
+
+small { opacity: 0.7; }
+</style>
+</head>
+
+<body>
+
+<header>
+    <h2>WebLook SaaS</h2>
+</header>
+
+<div class="container">
+
+<!-- LOGIN -->
+<div id="loginBox">
+    <h3>Login</h3>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Senha">
+
+    <button onclick="login()">Entrar</button>
+    <button onclick="register()">Criar conta</button>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+
+    <button onclick="logout()">Sair</button>
+
+    <h3>📦 Planos</h3>
+
+    <div class="card">
+        <p>Site Básico</p>
+        <button onclick="buy('Site Básico')">Contratar</button>
+    </div>
+
+    <div class="card">
+        <p>Site Profissional</p>
+        <button onclick="buy('Site Profissional')">Contratar</button>
+    </div>
+
+    <div class="card">
+        <p>Marketing Completo</p>
+        <button onclick="buy('Marketing Completo')">Contratar</button>
+    </div>
+
+    <h3>📁 Meus Planos</h3>
+    <div id="plans"></div>
+
+    <h3>🎧 Suporte</h3>
+    <textarea id="msg" placeholder="Escreva seu problema"></textarea>
+    <button onclick="sendTicket()">Enviar ticket</button>
+
+    <h3>📨 Meus Tickets</h3>
+    <div id="tickets"></div>
+
+</div>
+
+</div>
+
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+getAuth,
+createUserWithEmailAndPassword,
+signInWithEmailAndPassword,
+signOut,
+onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+import {
+getFirestore,
+collection,
+addDoc,
+query,
+where,
+getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* 🔥 SUA CONFIG FIREBASE */
+const firebaseConfig = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_APP.firebaseapp.com",
+  projectId: "SEU_APP",
+  storageBucket: "SEU_APP.appspot.com",
+  messagingSenderId: "XXXX",
+  appId: "XXXX"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+/* LOGIN */
+window.login = () => {
+  signInWithEmailAndPassword(auth,email.value,password.value)
+  .catch(()=>alert("Erro login"));
+}
+
+/* REGISTRO */
+window.register = () => {
+  createUserWithEmailAndPassword(auth,email.value,password.value)
+  .catch(()=>alert("Erro cadastro"));
+}
+
+/* LOGOUT */
+window.logout = () => signOut(auth);
+
+/* CONTRATAR PLANO */
+window.buy = async (plan) => {
+  const user = auth.currentUser;
+
+  await addDoc(collection(db,"plans"),{
+    uid: user.uid,
+    plan: plan,
+    status: "pendente",
+    date: Date.now()
+  });
+
+  loadPlans();
+}
+
+/* SUPORTE */
+window.sendTicket = async () => {
+  const user = auth.currentUser;
+
+  await addDoc(collection(db,"tickets"),{
+    uid: user.uid,
+    message: msg.value,
+    status: "aberto",
+    date: Date.now()
+  });
+
+  msg.value = "";
+  loadTickets();
+}
+
+/* PLANOS */
+async function loadPlans(){
+  const user = auth.currentUser;
+
+  const q = query(collection(db,"plans"), where("uid","==",user.uid));
+  const snap = await getDocs(q);
+
+  plans.innerHTML = "";
+
+  snap.forEach(doc=>{
+    const d = doc.data();
+
+    plans.innerHTML += `
+      <div class="card">
+        <b>${d.plan}</b><br>
+        Status: ${d.status}
+      </div>
+    `;
+  });
+}
+
+/* TICKETS */
+async function loadTickets(){
+  const user = auth.currentUser;
+
+  const q = query(collection(db,"tickets"), where("uid","==",user.uid));
+  const snap = await getDocs(q);
+
+  tickets.innerHTML = "";
+
+  snap.forEach(doc=>{
+    const d = doc.data();
+
+    tickets.innerHTML += `
+      <div class="card">
+        ${d.message}<br>
+        <small>Status: ${d.status}</small>
+      </div>
+    `;
+  });
+}
+
+/* LOGIN STATE */
+onAuthStateChanged(auth,(user)=>{
+  if(user){
+    loginBox.classList.add("hidden");
+    app.classList.remove("hidden");
+    loadPlans();
+    loadTickets();
+  } else {
+    loginBox.classList.remove("hidden");
+    app.classList.add("hidden");
+  }
+});
+
+const email = document.getElementById("email");
+const password = document.getElementById("password");
+const msg = document.getElementById("msg");
+
+const plans = document.getElementById("plans");
+const tickets = document.getElementById("tickets");
+</script>
+
+</body>
+</html>
